@@ -2,19 +2,19 @@
 <html>
 
 <head>
-<title>Server Builder for WWIIOL</title>
+<title>Server Builder for Rapid Assault</title>
 <link rel="stylesheet" type="text/css" href="style.css"/>
 </head>
 
 <body>
-<h1> PlayNet / Cornered Rat Software : Server Builder for <i>WWIIOL</i> </h1>
+<h1> PlayNet / Cornered Rat Software : Server Builder for <i>Rapid Assault</i> </h1>
 
 <h2 class="statement"> Copyright (C) PlayNet Inc. 2012 -- NOT FOR REDISTRIBUTION <h2/>
 <h2 class="statement"> DEVELOPMENT RELEASE </h2>
 
 <h3> REQUIREMENTS </h3>
 
-<p> <i>WWIIOL</i> clusters target 32-bit Ubuntu Linux 10.10
+<p> <i>Rapid Assault</i> clusters target 32-bit Ubuntu Linux 10.10
     or 11.04. They are designed and optimized to run on multi-core
     Intel x86. A minimum of 4 cores is recommended. </p>
 
@@ -29,7 +29,7 @@
 
 <h3> CLUSTER ARCHITECTURE </h3>
 
-<p> <i>WWIIOL</i> clusters comprise several physical machines
+<p> <i>Rapid Assault</i> clusters comprise several physical machines
     across which a number of functional roles are distributed. </p>
 
 <p> There are roles for the following standard Unix processes:
@@ -42,7 +42,7 @@
     <li> Web/Management Server </li>
 </ul>
 
-<p> and hosts for the following <i>WWIIOL</i> processes: </p>
+<p> and hosts for the following <i>Rapid Assault</i> processes: </p>
 
 <ul>
     <li> Authentication Server, </li>
@@ -51,7 +51,7 @@
     <li> Cell Host </li>
 </ul>
 
-<p> <i> Minimal </i>WWIIOL</i> DEVELOPMENT RELEASE cluster
+<p> <i> Minimal </i>Rapid Assault</i> DEVELOPMENT RELEASE cluster
     requires <b>3 machines</b>:</i> </p>
 
 <ol>
@@ -79,10 +79,10 @@
 
 <p> <i>NOTE: Each Map, Chat and Cell process requires a DISCRETE machine.</i> </p>
 
-<p> <i>WWIIOL</i> binaries, scripts, data, etc, will all be installed under
+<p> <i>Rapid Assault</i> binaries, scripts, data, etc, will all be installed under
    /playnet on the NFS server, and this will be exported to the remaining systems. </p>
 
-<p> NOTE: In all cases, <i>WWIIOL</i> cluster machines need access to a
+<p> NOTE: In all cases, <i>Rapid Assault</i> cluster machines need access to a
    private 192.168.1/24 network. Each cluster assumes the NFS server for that
    cluster will be reachable as 192.168.1.1. </p>
 
@@ -221,13 +221,13 @@ Options:
 
 <h3> Game data (/playnet/data) </h3>
 
-<p> Data is currently shipped in a Tar BZip2 file, e.g. wwiiol-data.tbz2. This
+<p> Data is currently shipped in a Tar BZip2 file, e.g. rapid-assault.data.tbz2. This
    extracted to /playnet on the NFS Server, e.g: </p>
 <pre>
-  $ tar xf wwiiol-data.tbz2 -C /playnet
+  $ tar xf rapid-assault.data.tbz2 -C /playnet
 </pre>
 
-<p> An initial install file is supplied as pkgs/wwiiol-data.tbz2 which will
+<p> An initial install file is supplied as pkgs/rapid-assault.data.tbz2 which will
    be installed by the installer. A more recent file can be used by replacing this
    file or specifying it's path in the DATAPKG_FILE variable. </p>
 
@@ -235,10 +235,10 @@ Options:
 
 <p> You will need to install the game server binaries and libraries. These are
    supplied as a .deb Debian Installer Package. E.g. for the file
-   <i>wwiiol-5626.Debug-BETA-Linux.deb</i>
+   <i>rapid-assault-5626.Debug-BETA-Linux.deb</i>
    you would type the following command on the <b>NFS Server</b> only: </p>
 <pre>
-  $ sudo dpkg -i ./wwiiol-5626.Debug-BETA-Linux.deb
+  $ sudo dpkg -i ./rapid-assault-5626.Debug-BETA-Linux.deb
 </pre>
 
 <p> An initial set of binaries are supplied with this package and will be

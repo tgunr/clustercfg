@@ -9,20 +9,20 @@
 export DEBUG=0
 
 ## Specify what the purpose of THIS box is.
-#export ROLE=strat export IS_AUTH=1	 	# For a strat+dbd server that includes an auth host.
-#export ROLE=strat						# For a strat+dbd server with separate auth
+#export ROLE=auth						# A dedicated auth-host.
+#export ROLE=map export IS_AUTH=1	 	# For a map server that includes an auth host.
+#export ROLE=map						# For a map server with separate auth.
 #export ROLE=chat						# For a chat server
-#export ROLE=map						# For a map server
 #export ROLE=cell						# For a cell host
 
 ## Final octet of the machine's IP address.
-export HOST=151
+export HOST=161
 
 #################### CLUSTER-WIDE COMMON SETTINGS.
 
 ## Cluster identify.
-export CLUSTER=wwiiol
-export ARENA_ID=1
+export CLUSTER=rab
+export ARENA_ID=222
 
 ## Networking configuration.
 export NETWORK=66.28.224
@@ -42,9 +42,9 @@ export GAMEDB_PASSWD=freebird
 ## Auth-database access.
 export AUTHDB_USER=authuser
 export AUTHDB_PASSWD=scalar449
-export AUTH_ADDRESS=${NETWORK}.151
-export AUTH_DB=${NETWORK}.151
+export AUTH_ADDRESS=${NETWORK}.161		# Using strat host for auth
+export AUTH_DB=${NETWORK}.161			# Using strat host for auth
 
 ## Where to redirect authentication errors in the user's browser.
-export AUTH_ERROR_URL=http://www.battlegroundeurope.com/scripts/wwiionline/error.jsp
+export AUTH_ERROR_URL=http://www.rapidassaultgame.com/error.jsp
 

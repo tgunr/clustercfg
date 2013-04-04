@@ -1,10 +1,10 @@
-PlayNet / Cornered Rat Software : Server Builder for WWIIOL
+PlayNet / Cornered Rat Software : Server Builder for Rapid Assault
 
 Copyright (C) PlayNet Inc. 2012 -- NOT FOR REDISTRIBUTION
 DEVELOPMENT RELEASE
 REQUIREMENTS
 
-WWIIOL clusters target 32-bit Ubuntu Linux 10.10 or 11.04. They are designed and optimized to run on multi-core Intel x86. A minimum of 4 cores is recommended.
+Rapid Assault clusters target 32-bit Ubuntu Linux 10.10 or 11.04. They are designed and optimized to run on multi-core Intel x86. A minimum of 4 cores is recommended.
 
 Installation testing can be performed using Virtual Machines, but production performance will be extremely poor if virtualized.
 
@@ -14,7 +14,7 @@ The system must be configured with a "wwiiol" user.
 
 CLUSTER ARCHITECTURE
 
-WWIIOL clusters comprise several physical machines across which a number of functional roles are distributed.
+Rapid Assault clusters comprise several physical machines across which a number of functional roles are distributed.
 
 There are roles for the following standard Unix processes:
 
@@ -23,13 +23,13 @@ MySQL Game Database Server,
 NFS Server,
 IRC Server,
 Web/Management Server
-and hosts for the following WWIIOL processes:
+and hosts for the following Rapid Assault processes:
 
 Authentication Server,
 Map Host,
 Chat Host,
 Cell Host
-Minimal WWIIOL DEVELOPMENT RELEASE cluster requires 3 machines:
+Minimal Rapid Assault DEVELOPMENT RELEASE cluster requires 3 machines:
 
 MySQL Auth, MySQL Game, NFS, IRC, Web and Map,
 Chat Host,
@@ -48,9 +48,9 @@ Cell Host,
 Cell Host
 NOTE: Each Map, Chat and Cell process requires a DISCRETE machine.
 
-WWIIOL binaries, scripts, data, etc, will all be installed under /playnet on the NFS server, and this will be exported to the remaining systems.
+Rapid Assault binaries, scripts, data, etc, will all be installed under /playnet on the NFS server, and this will be exported to the remaining systems.
 
-NOTE: In all cases, WWIIOL cluster machines need access to a private 192.168.1/24 network. Each cluster assumes the NFS server for that cluster will be reachable as 192.168.1.1.
+NOTE: In all cases, Rapid Assault cluster machines need access to a private 192.168.1/24 network. Each cluster assumes the NFS server for that cluster will be reachable as 192.168.1.1.
 
 SERVER ROLES
 
@@ -148,16 +148,16 @@ Again, reboots may be required. In all cases, "HOST=..." is optional if you wish
 
 Game data (/playnet/data)
 
-Data is currently shipped in a Tar BZip2 file, e.g. wwiiol-data.tbz2. This extracted to /playnet on the NFS Server, e.g:
+Data is currently shipped in a Tar BZip2 file, e.g. rapid-assault.data.tbz2. This extracted to /playnet on the NFS Server, e.g:
 
-  $ tar xf wwiiol-data.tbz2 -C /playnet
-An initial install file is supplied as pkgs/wwiiol-data.tbz2 which will be installed by the installer. A more recent file can be used by replacing this file or specifying it's path in the DATAPKG_FILE variable.
+  $ tar xf rapid-assault.data.tbz2 -C /playnet
+An initial install file is supplied as pkgs/rapid-assault.data.tbz2 which will be installed by the installer. A more recent file can be used by replacing this file or specifying it's path in the DATAPKG_FILE variable.
 
 Server Binaries (/playnet/wwiiol/bin, /playnet/wwiiol/lib)
 
-You will need to install the game server binaries and libraries. These are supplied as a .deb Debian Installer Package. E.g. for the file wwiiol-5626.Debug-BETA-Linux.deb you would type the following command on the NFS Server only:
+You will need to install the game server binaries and libraries. These are supplied as a .deb Debian Installer Package. E.g. for the file rapid-assault-5626.Debug-BETA-Linux.deb you would type the following command on the NFS Server only:
 
-  $ sudo dpkg -i ./wwiiol-5626.Debug-BETA-Linux.deb
+  $ sudo dpkg -i ./rapid-assault-5626.Debug-BETA-Linux.deb
 An initial set of binaries are supplied with this package and will be installed during server configuration. Updates can be installed by performing a "dpkg -i" on the most recent '.deb'ian package available.
 
 Operating the cluster
