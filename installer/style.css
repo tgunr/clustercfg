@@ -1,0 +1,45 @@
+body {
+ font-family: Times New Roman, Arial, Verdana ;
+}
+
+pre {
+ border: dotted 1px gray ;
+ background-color: #f0f0ff ;
+ margin-left: 32px ;
+ margin-right: 32px ;
+ margin-top: 8px ;
+ margin-bottom: 8px ;
+ padding: 8px ;
+ font-family: Consolas, Inconsolata, Sans-Serif ;
+}
+
+h1 {
+ text-align: center ;
+}
+
+h1, h2, h3, h4, h5 {
+ color: blue ;
+ padding-left: 2px ;
+ margin-left: -4px ;
+}
+
+.statement {
+ text-align: center ;
+ font-family: Courier New, Monospace, Console ;
+ margin: 4px ;
+ padding-left: 16px ;
+ padding-right: 16px ;
+ padding-top: 4px;
+ padding-bottom: 4px ;
+ border: 2px solid red ;
+}
+
+h3 {
+ border-top: 1px dotted #808080 ;
+ border-left: 1px dotted #808080 ;
+}
+
+ p {
+  margin-left: 4px ;
+  padding-right: 2px ;
+}

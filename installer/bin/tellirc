@@ -1,0 +1,34 @@
+#! /usr/bin/perl
+
+use Socket ;
+
+sub ircNotify($$$)
+{
+ my ($user, $channels, $reason) = (@_) ;
+ my $proto = getprotobyname('tcp') ;
+ socket(Sock, PF_INET, SOCK_STREAM, $proto);
+ my $port = getservbyname('ircd', 'tcp') ;
+ my $sin = sockaddr_in($port,inet_aton("66.28.224.235"));
+ if ( !connect(Sock, $sin) ) {
+  print "Unable to connect to IRC server\n" ;
+  return;
+ }
+ print Sock "PASS blooGit\nNICK $user\nUSER $user $user $user :$user\n" ;
+ sleep 1;
+ print Sock "PRIVMSG $channels :$reason\n" ;
+ sleep 1;
+ print Sock "QUIT\n" ;
+ close(Sock) ;
+}
+
+die "Usage: $0 <username> <channel,channel,...> <reason>" unless ( $#ARGV >= 2 ) ;
+
+my $user = shift ;
+my $channels = shift ;
+my $reason = join(' ', @ARGV) ;
+
+die "Invalid username\n" if ( $user =~ /[^\w-]/ ) ;
+die "Invalid channel list\n" if ( $channels !~ /^(#[A-Za-z-]+)(,#[A-Za-z-]+)*$/ ) ;
+
+ircNotify($user, $channels, $reason) ;
+

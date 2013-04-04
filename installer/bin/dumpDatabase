@@ -1,0 +1,33 @@
+#!/bin/bash 
+
+BACKUP_FILE="wwiionline.backup.sql"
+_roll () {
+ dest=`expr $1 + 1`
+ rm -f "$BACKUP_FILE.$dest.gz"
+ [ -f "$BACKUP_FILE.$1.gz" ] && mv -f "$BACKUP_FILE.$1.gz" "$BACKUP_FILE.$dest.gz"
+}
+
+for i in 6 5 4 3 2 1 0 ; do _roll $i ; done
+[ -f "$BACKUP_FILE" ] && {
+ mv "$BACKUP_FILE" "$BACKUP_FILE.0"
+ gzip -9 "$BACKUP_FILE.0"
+}
+
+mysqldump \
+	--add-drop-table --delayed-insert --disable-keys --extended-insert --no-autocommit \
+	--quick \
+	-h 66.28.224.181 -u wwiiol -pfreebird \
+	wwiionline \
+ chat_commands chat_friends chat_group_audit chat_group_cmds chat_group_members chat_group_permiss chat_groups chat_ignore chat_tunes \
+ ext_missions ext_vehicle_adjust \
+ ids_cp ids_facility \
+ mission_eggs \
+ strat_capitol strat_captures strat_cp strat_cp_captures strat_damage strat_deployment strat_facility strat_facility_supplies \
+ strat_facilitytype strat_hc_hqs strat_hc_moves strat_hc_structure strat_hc_units strat_link strat_object strat_objecttype strat_scripts \
+ strat_supercell strat_vehicle_levels strat_waypoint \
+ wwii_arena wwii_branch wwii_config wwii_connection_statuses wwii_country wwii_hack_motd_type wwii_hits wwii_kill wwii_languages \
+ wwii_motd wwii_motd_messages wwii_motd_objects wwii_motd_states wwii_object_classes wwii_objects wwii_permissions \
+ wwii_persona wwii_player wwii_player_permiss wwii_poll wwii_poll_entry wwii_rank wwii_rank_permiss wwii_rank_types \
+ wwii_reserved_squadnames wwii_rtb_codes wwii_serial_numbers wwii_sortie wwii_squad_actions wwii_squad_ranks wwii_squads \
+ wwii_vehcat wwii_vehclass wwii_vehtype \
+ >$BACKUP_FILE

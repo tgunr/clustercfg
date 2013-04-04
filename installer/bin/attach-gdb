@@ -1,0 +1,13 @@
+#! /bin/sh
+
+. /playnet/bin/common.sh
+
+cmd="$pidof $BE_ROLE"
+pid=`eval $cmd`
+
+if test "x$pid" = "x" ; then
+ echo "$BE_ROLE not running"
+else
+ echo "Attaching to $BE_ROLE pid $pid"
+ gdb /playnet/wwiiol/bin/$BE_ROLE $pid
+fi

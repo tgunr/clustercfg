@@ -1,0 +1,33 @@
+#!/bin/bash
+
+. /playnet/bin/common.sh
+
+HOMEDIR='/home/wwiiol'
+LOGDIR='/home/wwiiol/logs'
+DATE=`date +%Y-%m-%d-%H.%M.%S`
+CORE_FILES="core"	# Under Ubuntu, core files are just "core", other OSes append PID, e.g. core.12157
+
+mkdir -p "${LOGDIR}/${DATE}"
+
+# Under Ubuntu, core files are simply "core".
+for processPath in "${HOMEDIR}"/{authHost,chatd,hostd,mmhostd}
+do
+  if [ -d "${processPath}" ] ; then
+   role="${processPath##*/}"	# Just the last part of the pathname.
+   if [ -e "${processPath}/core" ] ; then
+     mv -f "${processPath}/core" "${LOGDIR}/${DATE}/core.${role}"
+   fi
+   # Check for core files with suffixes.
+   cores=$(ls ${processPath}/core.* 2>/dev/null)
+   if [ ! -z "${cores}" ] ; then
+    for core in ${cores}
+    do
+      suffix="${core##*/}"	# Just the last part of the filename.
+      mv -f "${core}" "${LOGDIR}/${DATE}/core.${role}.${suffix}"
+    done
+   fi
+  fi
+done
+
+mv /tmp/${BE_ROLE}.*.log ${LOGDIR}/${DATE} >/dev/null 2>&1
+
