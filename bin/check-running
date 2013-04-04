@@ -1,0 +1,25 @@
+#! /bin/sh
+#
+# If the cluster is not flagged as down and a particular host
+# process is not running, then restart the cluster
+
+. /playnet/bin/common.sh
+
+if test ! -r /playnet/wwiiol/bin/${BE_ROLE} ; then
+  echo "FAIL: Unrecognized host process: ${BE_ROLE}"
+  exit 1
+fi
+
+if test -e $CLUSTER_DOWN ; then
+ exit 0
+fi
+
+PID=`eval $pidof $BE_ROLE`
+if test -z "$PID" ; then
+ stophost
+ /playnet/bin/send-alert 'CRASHED' "${BE_ROLE} process on $(hostname) had stopped and is being auto-restarted."
+ (echo -n "* Restarting $BE_ROLE: " ; date) >>/tmp/server.watch
+ echo "Restarting server process"
+ starthost
+fi
+

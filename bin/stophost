@@ -1,0 +1,52 @@
+#! /bin/bash
+#
+# Stop the designated host process for this machine
+
+# Make sure this is being done as the wwiiol user
+user=`id -un`
+if [ ! "$user" = "wwiiol" ]; then
+ echo "Must run as wwiiol - you are $user"
+ exit 1
+fi
+
+. /playnet/bin/common.sh
+
+for app in ${apps} ; do
+ home="/home/${user}/${app}"
+ if [ ! -d "${home}" ] ; then mkdir -p "${home}" || { echo "FAIL: Missing ${home} directory" ; exit 1 ; } ; fi
+ if [ ! -d "/home/${user}/logs" ] ; then mkdir -p "/home/${user}/logs" || { echo "FAIL: Missing /home/${user}/logs directory" ; exit 1 ; } ; fi
+
+ exe="/playnet/wwiiol/bin/${app}"
+ if [ ! -x "${exe}" ] ; then echo "FAIL: Missing ${exe}" ; exit 1 ; fi
+done
+
+touch "${CLUSTER_DOWN}"
+
+fail=0
+for app in ${apps} ; do
+ killall -q ${app} >/dev/null 2>&1
+done
+sleep 1
+for app in ${apps} ; do
+ pid=`eval ${pidof} ${app}`
+ if [ ! -z "${pid}" ] ; then
+  sleep 4
+  killall -q -9 ${app}
+  pid=`eval ${pidof} ${app}`
+ fi
+ if [ ! -z "${pid}" ] ; then
+  echo "FAIL: ${app} pid ${pid} still running"
+  fail=1
+ else
+  echo "${app} stopped"
+ fi
+done
+
+if [ $fail != 0 ] ; then
+ exit $fail
+fi
+
+touch "${CLUSTER_DOWN}"
+
+/playnet/bin/save-logs
+

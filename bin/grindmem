@@ -1,0 +1,44 @@
+#! /bin/bash
+######################################################################
+# Launch the host process under valgrind.
+
+#### Configuration
+
+# Path to the valgrind application
+valgrind=/usr/bin/valgrind
+# Arguments for valgrind
+valargs="--tool=memcheck --read-var-info=yes --leak-check=full --leak-resolution=high --undef-value-errors=yes --track-origins=yes --free-fill=0xef --num-callers=16"
+
+tarfile="${HOME}/${BE_ROLE/d/}grindmem.tar"
+
+if [ ! -x ${valgrind} ] ; then
+  echo "'valgrind' is not installed."
+  exit 1
+fi
+
+BE_ROLE=${BE_ROLE:-`cat ${HOME}/etc/berole.rc`}
+if [ -z "${BE_ROLE}" ] ; then
+  echo "BE_ROLE not defined"
+  exit 1
+fi
+
+if [ ! -z $(pidof "${BE_ROLE}") ] ; then
+  stophost
+fi
+
+basepath="${HOME}/${BE_ROLE}"
+if ! cd "${basepath}" ; then
+  echo "Unable to cd to /home/wwiiol/${BE_ROLE}"
+  exit 1
+fi
+
+rm -f val.* ${tarfile} ${tarfile}.bz2
+
+cmd="${valgrind} ${valargs} $* /playnet/wwiiol/bin/${BE_ROLE} >${basepath}/val.out 2>${basepath}/val.err"
+if [ ${DEBUG} ] ; then echo "+ $cmd" ; fi
+eval $cmd
+
+if [ ${DEBUG} ] ; then echo "+ Creating ${tarfile}.bz2" ; fi
+tar cf ${tarfile} val.*
+bzip2 -9 ${tarfile}
+

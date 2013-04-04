@@ -1,0 +1,75 @@
+#! /bin/bash
+#
+# Start the designated host process for this machine
+
+# Make sure this is being done as the wwiiol user
+user=`id -un`
+if [ ! "$user" = "wwiiol" ]; then
+ echo "Must run as wwiiol - you are $user"
+ exit 1
+fi
+
+. /playnet/bin/common.sh
+
+# Check for executables and that they aren't already running.
+for app in ${apps} ; do
+ home="/home/${user}/${app}"
+ if [ ! -w "${home}" ] ; then mkdir -p ${home} ; fi
+ if [ ! -w "${home}" ] ; then echo "FAIL: Unable to access ${home}" ; exit 1 ; fi
+
+ exe="/playnet/wwiiol/bin/${app}"
+ stat "${exe}" >/dev/null 2>&1		# Make NFS happy
+ if [ ! -x "${exe}" ] ; then echo "FAIL: Missing ${exe}" ; exit 1 ; fi
+
+ pid=`eval ${pidof} ${app}`
+ if [ ! -z "${pid}" ] ; then
+  echo "FAIL: ${app} already running [pid ${pid}]"
+  exit 1
+ fi
+
+ if [ ! -e "${home}/data" ] ; then
+  ln -s /playnet/wwiiol/bin/data ${home}/
+ fi
+done
+
+touch ${CLUSTER_DOWN}
+
+ulimit -c 204800
+ulimit -n 8000
+
+function abort () {
+ for app in ${apps} ; do
+   killall -q -9 ${app}
+ done
+ die $*
+}
+
+# Clear out log files first.
+for app in ${apps} ; do rm -rf /tmp/${app}.*.log ; done
+
+# Now start all processes.
+for app in ${apps} ; do
+ home="/home/${user}/${app}"
+ cd ${home} || exit "Unable to chdir to ${home}"
+
+ exe="/playnet/wwiiol/bin/${app}"
+ eval "${exe} >/dev/null 2>&1 </dev/null &" || {
+  abort "FAIL: Unable to launch ${exe}: $?"
+ }
+
+ sleep 5
+
+ pid=`eval ${pidof} ${app}`
+ if [ -z "${pid}" ] ; then
+  tail -30 /tmp/${app}.0.log
+  abort "FAIL: ${app} terminated after starting."
+ fi
+
+ echo "${app} started."
+done
+
+# Remove the cluster-down flag.
+rm -f ${CLUSTER_DOWN}
+
+exec 0>&- ; exec 1>&- ; exec 2>&-
+

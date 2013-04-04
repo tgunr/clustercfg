@@ -5,226 +5,302 @@
 #
 # Installs packages, configures nfs, etc.
 
+export PRODUCT="wwiiol"
+
 ######################################################################
 ## Helper functions
 
-ww2copy() {
-  rm -rf "${1}"
-  su -c "cp -dR --preserve=mode,timestamps '/playnet/old${1}' '${1}'" -l wwiiol
+debugOut() {
+ if test "x$DEBUG" = "x1" ; then echo -ne "\e[m\e[32m" ; echo "--i  $*" ; echo -ne "\e[m" ; fi
+}
+report() {
+ echo -ne "\e[m*** \e[36m" ; echo $* ; echo -ne "\e[m"
+}
+wait_5s() {
+ if [ "x${NO_WAITS}" != "x1" ] ; then
+  for i in 5 4 3 2 1 ; do echo -ne "\r(Continuing in $i seconds)" ; sleep 1 ; done
+  echo -ne "\r                                      \r"
+  sleep 1
+ fi
+}
+warn() {
+ echo -ne "\e[m\e[31mWARNING: \e[33m" ; echo $* ; echo -ne "\e[m"
+ wait_5s
+}
+showUsage() {
+ echo -ne "\e[m\e[33m"
+ echo "Usage:"
+ echo "    ROLE=strat|map|chat|cell|auth [options] $0"
+ echo "Options:"
+ cat <<END_OPTIONS
+    APT_CACHE=nn.nn.nn.nn        Configure APT to use proxy at given address
+    ARENA_ID=nnn                 Specifies arena ID (map only)
+    AUTH_ADDRESS=nn.nn.nn.nn     Specifies IP address of auth server
+    AUTH_DB=nn.nn.nn.nn          Specifies auth database (if not auth server)
+    AUTHDB_USER=...              Override default authdb username (authuser)
+    AUTHDB_PASSWD=...            Specify default authdb password
+    AUTH_ERROR_URL=http://       Prefix for browser-redirects on auth errors
+    CLUSTER=clustername          Short name for the cluster (map only)
+	CLEAN_DB=1                   Remove an re-install MySQL (db only)
+    DATAPKG_FILE=...path...      Non-default /playnet/data tar file (map only)
+    DEBUG=1                      Enable extra script output
+    DEFAULT_DBCHARSET=...        Default database characterset
+    GAMEDB_USER=...              Override default username for main database user
+    GAMEDB_PASSWD=...            Override default password for main database user
+    GATEWAY=nn.nn.nn.nn          Gateway IP for primary network
+    GATEWAY2=nn.nn.nn.nn         Gateway IP for secondary network
+    HOST=nnn                     Host address for the machine (last octet)
+    IS_AUTH=1                    Include local auth installation (map only)
+    NAMESERVER=...               IP address of primary nameserver
+    NETMASK=nn.nn.nn.nn          Netmask for primary network
+    NETMASK2=nn.nn.nn.nn         Netmask for secondary network
+    NETWORK=...                  Network address for primary interface
+    NETWORK2=nn.nn.nn            Network address for [optional] secondary interface
+    NO_DB_INSTALL=1              Skip database installation
+    NO_WAITS=1                   Don't sleep after warnings
+    ROOTDB_PASSWD=...            Specify the root password for the game database
+END_OPTIONS
+ echo -ne "\e[m"
+}
+die() {
+ echo -e "\e[m\e[31mERROR: $*\e[m"
+ exit 1
+}
+dieWithUsage() {
+ echo -e "\e[m\e[31mERROR: $*\e[m"
+ showUsage
+ exit 1
 }
 ww2mkdir() {
-  rm -rf ${1}
-  su -c "mkdir -p '${1}'" -l wwiiol
+  if [ ! -d "${1}" ] ; then
+   debugOut "Creating [${1}] with wwiiol as owner"
+   su -c "mkdir -p '${1}'" -l wwiiol
+  fi
+}
+function run_script () {
+ local script="$1" ; shift
+ cmd=". scripts/${script}"
+ debugOut "Executing: $cmd"
+ eval ${cmd} || die "${script} failed."
+}
+function require_var () {
+ # Test the variable named in arg[0] is not empty.
+ local test="[ \! -z \${$1} ]"
+ eval ${test} || die "No value for ${1} specified (required for ${BE_ROLE} servers)."
 }
 
+case "x$1" in
+    x) ;;
+    x-h|x-?|x--help|x-help) showUsage ; exit 0 ;;
+    x*) dieWithUsage "Unknown command line arguments: $*" ;;
+esac
+
 ######################################################################
-## Script entry point.
+## Check for pre-requisites.
 
 # Require this script to be run as root.
 if [ $(id -u) -ne 0 ] ; then
-  echo "ERROR: Must be run as superuser or via sudo"
-  exit -1
+  dieWithUsage "Must be run as superuser or via sudo"
 fi
-
-addr=$(ifconfig eth0 | perl -ne 'print $1 if /addr:66.28.224.(\d+)/')
-if [ -z "${addr}" ] ; then
-  echo "ERROR: eth0 is not configured to 66.28.224.blah"
-  exit -1
-fi
-
-# Configure Apt proxy
-_proxyFile=/etc/apt/apt.conf.d/02proxy
-if [ ! -f "${_proxyFile}" ] ; then
-	echo "* Configuring APT Proxy/Cache"
-	echo 'Acquire::http { Proxy "http://66.28.224.242:3142"; };' >$_proxyFile
-fi
-
-# Determine which role we are running.
-Role=""
-Strat=0 ; Chat=0 ; Map=0 ; Cell=0
-case ${ROLE} in
-	strat) Role="stratd" ; Strat=1 ;;
-	chat) Role="chatd"; Chat=1 ;;
-	map) Role="mmhostd"; Map=1 ;;
-	cell) Role="cellhost"; Cell=1 ;;
-	*)
-		echo "USAGE: ROLE=strat|map|chat|cell $0"
-		exit 1
-	;;
-esac
 
 # Get the user ID of the wwiiol user.
 Uid=$(id -u wwiiol)
-if [ -z ${Uid} ] ; then echo "ERROR: No 'wwiiol' user found" ; exit 2 ; fi
+if [ -z ${Uid} ] ; then die "No 'wwiiol' user found - has to be added manually." ; fi
 Gid=$(id -g wwiiol)
-if [ -z ${Gid} ] ; then echo "ERROR: No 'wwiiol' group found" ; exit 3 ; fi
+if [ -z ${Gid} ] ; then die "No 'wwiiol' group found - has to be added manually." ; fi
 
-# The game needs a lot of file descriptors.
-_limitFile="/etc/security/limits.conf"
-if [ -z "$(grep wwiiol.*nofile ${_limitFile})" ] ; then
- echo "* Adjusting ulimits [${_limitFile}]"
- echo >>$_limitFile
- echo >>$_limitFile "# game needs higher ulimits"
- echo >>$_limitFile "wwiiol hard nofile 10240"
- echo >>$_limitFile "wwiiol soft nofile 4096"
+# Check for Ubuntu
+. scripts/operating-system-check.sh || die "Operating System Checks failed"
+
+######################################################################
+## Environment / parameter checks.
+
+# "ROLE" specifies what kind of server we will be running,
+# which is used to identify packages that will be installed,
+# which scripts from the "scripts" folder will be run, and
+# what the contents of /home/wwiiol/etc/berole.rc will be.
+Role=""
+Strat=0 ; DBD=0 ; Chat=0 ; Map=0 ; Cell=0 ; AuthHost=0
+isDev=0
+case x${ROLE} in
+    xauth*) Role="authHost" ; AuthHost=1 ;;
+	xstrat) Role="stratd" ; Strat=1 ; DBD=1 ;;
+    xchat|xchatd) Role="chatd"; Chat=1 ;;
+    xmap|xmmhost|xmmhostd) Role="mmhostd"; Map=1 ;;
+    xcell|xhostd|xcellhost) Role="hostd"; Cell=1 ;;
+    x) dieWithUsage "No ROLE specified." ;;
+    x*) dieWithUsage "Unknown ROLE: ${ROLE}." ; Fail=1 ;;
+esac
+BE_ROLE=${Role}
+
+if [ ${AuthHost} -eq 1 ] ; then
+ # Force these values to be used for AuthHost.
+ CLUSTER="Auth"
+ ARENA_ID="0"
+ APP_ID="0"
 fi
 
-# Create the playnet directory.
-if [ ! -d /playnet ] ; then
-	echo "* Creating /playnet"
-	mkdir /playnet
-fi
-chown wwiiol.wwiiol /playnet
+export GAMEDB_USER=${GAMEDB_USER:-wwiiol}
+export AUTHDB_USER=${AUTHDB_USER:-authuser}
 
-# LVM2 will be required on the strat server, everyone needs vim and nfs common.
-echo "* Installing stock system components"
-apt-get install -q -q -y nfs-common vim lvm2 byobu
-apt-get purge -q -q -y ppp pppoeconf pppconfig apparmor apparmor-utils apport apport-symptoms \
-	laptop-detect powermgmt-base wpasupplicant wireless-tools
+######################################################################
+# Translate the role into various configuration parameters.
 
-# Strat server should have it's prior incarnation available as an LVM volume.
-if [ ${Strat} -eq 1 ] ; then
-  echo "* Activating pre-existing LVM2 mounts"
-  vgchange -a y
-  lvscan
-  ww2mkdir /playnet/old
+NFSServer=0			# Whether or not this server acts as cluster NFS master
+IsLocalMaster=0		# Whether this role is responsible for providing local configuration files
+					# (chat, cell, etc, use the nfs mount instead)
+DBServer=0			# Whether this host will be hosting it's own database
+Auth=0				# Will I be hosting Auth
+AuthDB=0			# Will have local copy of the auth db (inc. mirrors)
+IS_AUTH=${IS_AUTH:-0}
+CleanDB=${CLEAN_DB:-0}
 
-  mounted=0
-
-  # Can we find the old root lvm partition?
-  echo "* Locating previous root partition."
-  if [ -e /dev/VolGroup00 ] ; then
-    # get a list of logical volume names (lvs -o lv_name)
-    # sort them by descending size (-O -lv_size)
-    # take the first one (head -1)
-    # and that should be the old root partition.
-	if [ -e /dev/VolGroup00/lvRoot ] ; then
-		rootGuess='lvRoot'
-	else
-		rootGuess=$(lvs --noheadings -o lv_name -O -lv_size VolGroup00 | head -1)
-	fi
-    if [ ! -z "${rootGuess}" ] ; then
-      lvPath="/dev/VolGroup00/${rootGuess// }"	# Strip spaces
-      if [ -e "${lvPath}" ] ; then
-        echo "* Guessing old root folder is ${lvPath}"
-        echo >>/etc/fstab "# Mount the old root filesystem"
-        echo >>/etc/fstab "${lvPath} /playnet/old ext3 defaults,noatime,nodiratime,ro 1 1"
-        mount /playnet/old
-        if [ -d /playnet/old/playnet ] ; then mounted=1 ; fi
-      fi
-    fi
+if [ ${IS_AUTH} -eq 1 ] ; then
+  if [ ${Strat} -eq 0 ] ; then
+    dieWithUsage "'IS_AUTH' can only be specified for Map role"
   fi
+  debugOut "Configuring as Strat + Auth [IS_AUTH=1]"
+  Auth=1
+fi
+if [ ${AuthHost} -eq 1 ] ; then Auth=1 ; fi
 
-  if [ ${mounted} -eq 0 ] ; then
-    # Ask them to configure /playnet/old
-    PS1="# Please mount old drive as /playnet/old and then type exit.\n\w# " \
-      bash --norc -i
-  fi
+# For now, the NFS server is also the strat server
+if [ ${Strat} -eq 1 ] ; then NFSServer=1 ; fi
 
-  # Check they did it.
-  if [ ! -d /playnet/old/playnet ] ; then
-    echo "ERROR: Unable to locate /playnet/old/playnet -- aborting."
-	exit 1
-  fi
+# Auth and strat hosts need local data stuff.
+if [ ${Strat} -eq 1 -o ${Auth} -eq 1 ] ; then IsLocalMaster=1 ; fi
+if [ ${Strat} -eq 1 -o ${Auth} -eq 1 ] ; then AuthDB=1 ; fi
+
+# Database host is also the strat server
+if [ ${IsLocalMaster} -eq 1 ] ; then DBServer=1 ; fi
+if [ ${NO_DB_INSTALL} ] ; then DBServer=0 ; fi
+
+debugOut "Role=${Role}, Strat=${Strat}, DBD=${DBD}, Chat=${Chat}, Map=${Map}, Cell=${Cell}, AuthHost=${AuthHost}, isDev=${isDev}, BE_ROLE=${BE_ROLE},"
+debugOut "NFSServer=${NFSServer}, ILM=${IsLocalMaster}, DBServer=${DBServer}, Auth=${Auth}"
+
+######################################################################
+# Check for required variables.
+
+# "CLUSTER" specifies the name to be given to this cluster.
+if [ ${IsLocalMaster} -eq 1 ] ; then require_var CLUSTER ; fi
+if [ ${IsLocalMaster} -eq 1 ] ; then require_var ARENA_ID ; fi
+if [ ${DBServer} -eq 1 -a -z "${ROOTDB_PASSWD}" ] ; then require_var ROOTDB_PASSWD ; fi
+if [ ${IsLocalMaster} -eq 1 ] ; then require_var AUTH_ERROR_URL ; fi
+if [ ${AuthDB} -eq 1 ] ; then require_var AUTHDB_USER ; require_var AUTHDB_PASSWD ; fi
+require_var AUTH_ADDRESS
+
+######################################################################
+# Validate configuration with regards to networking.
+
+is_eth0_configured="$(perl -ne 's/\s*\#.*// ; print if /eth0\s.*static/' /etc/network/interfaces)"
+if [ -z "${is_eth0_configured}" -a \( -z "${NETWORK}" -o -z "${HOST}" \) ] ; then
+ dieWithUsage "'eth0' is not statically configured and no NETWORK or HOST specified."
 fi
 
-ww2mkdir /home/wwiiol/etc
-echo "${Role}" >/home/wwiiol/etc/berole.rc ; chown wwiiol.wwiiol /home/wwiiol/etc/berole.rc
-
-echo "* Installing additional components"
-apt-get install -y lua5.1 liblua5.1-0 liblua5.1-json subversion mysql-client gdb libopenthreads12
-
-if [ ${Strat} -eq 1 ] ; then
-  echo "* Installing strat-specific features"
-  apt-get install -y nfs-kernel-server mysql-server
-
-  echo "* Configuring exports"
-  echo "/playnet 192.168.10.0/24(sec=sys,ro,async,no_subtree_check,all_squash,anonuid=1000,anongid=1000,fsid=0)" >>/etc/exports
-else
-  echo "* Installing non-strat specific features"
-
-  echo "* Configuring NFS mounts"
-  echo "192.168.10.1:/ /playnet nfs4 auto,async,ro,nolock,intr 0 0" >>/etc/fstab
+curNet=$(ifconfig eth0 | perl -ne 'print $1 if /inet\s+addr:(\d+\.\d+\.\d+)\.(\d+)/')
+net="${NETWORK:-$curNet}"
+if [ -z "${net}" ] ; then
+ dieWithUsage "'eth0' is not configured, and no network address provided."
+fi
+if [ "$net" != "$curNet" ] ; then
+ warn "eth0 is currently configured as ${curNet}, will reconfigure as ${net}"
+ NeedNet=1
+fi
+if [ "${net}" = "192.168.0" ] ; then
+ isDev=1
+ warn "192.168.0 network: assuming DEV cluster."
 fi
 
-# Need to modify .bashrc
-tmpRc=/tmp/new.bashrc
-cat >/tmp/new.bashrc <<END_BASHRC
-# Load the necessary paths before we do any fancy stuff.
-if [ -f /playnet/etc/wwiiolrc ]; then
-        . /playnet/etc/wwiiolrc
+curAddr=$(ifconfig eth0 | perl -ne "print \$1 if /inet addr:\\d+\.\\d+\.\\d+\\.(\\d+)/")
+if [ ! -z "${curAddr}" ] ; then
+ debugOut "eth0 currently configured as ${curAddr}"
+ if [ ! -z "${HOST}" -a "${HOST}" != "${curAddr}" ] ; then
+  warn "Reconfiguring host as ${HOST}"
+  NeedNet=1
+ fi
+fi
+addr=${HOST:-${curAddr}}
+
+if [ ${NFSServer} -eq 1 -a $isDev -eq 1 -a ${ARENA_ID} -eq 1 ] ; then
+ if [ "x${DEV_ARENA_1}" != "xPlease" ] ; then
+  die "Configuring dev cluster as ARENA_ID ${ARENA_ID} is a really, really bad idea.\n" \
+     "  If you're absolutely sure you want to do this,\n" \
+     "  set the environment variable DEV_ARENA_1 to Please, e.g.\n" \
+     "  export DEV_ARENA_1=Please"
+ else
+  warn "Configuring DEV cluster as ARENA_ID ${ARENA_ID}"
+ fi
 fi
 
-for dir in /playnet/bin /playnet/wwiiol/bin ~/bin
+######################################################################
+# Report configuration status.
+
+debugOut "Configure script starting:"
+debugOut "ROLE=${ROLE} NFSServer=${NFSServer} DBServer=${DBServer}"
+debugOut "Using primary IP Address ${net}.${addr}"
+if [ ! -z "${NETWORK_SEC_NET}" ] ; then
+ debugOut "Secondary IP address ${NETWORK_SEC_NET}.${addr}"
+fi
+
+# Make backup copies of files we know we're going to tamper with.
+for file in /etc/network/interfaces /etc/fstab /etc/exports /home/wwiiol/.bashrc /etc/security/limits.conf
 do
-        [ -d \$dir -a -x \$dir ] && PATH=\$PATH:\$dir
+ if [ -f "${file}" -a ! -f "${file}.orig" ] ; then debugOut "Saving backup copy of $file as $file.orig" ; cp "${file}" "${file}.orig" ; fi
 done
 
-export PATH
-END_BASHRC
-cat /home/wwiiol/.bashrc >>${tmpRc}
-mv ${tmpRc} /home/wwiiol/.bashrc
-chown wwiiol.wwiiol /home/wwiiol/.bashrc
+######################################################################
 
-ln -s /playnet/wwiiol /usr/local/wwiiol
-ln -s /playnet/teulKit /usr/local/teulKit
+#####################################
+## ## ## BEGIN CONFIGURATION ## ## ##
+#####################################
 
-addr=$(ifconfig eth0 | perl -ne 'print $1 if /addr:66.28.224.(\d+)/')
-configureNetwork () {
- interface=$1 ; shift
- address=$1 ; shift
- netmask=$1 ; shift
- gateway=$1
- 
- ifup ${interface} 2>/dev/null
- if [ -z "$(ifconfig 2>/dev/null ${interface} | grep 'inet addr:')" ] ; then
-  echo "* Configuring $interface: $address"
-  echo >>/etc/network/interfaces
-  echo >>/etc/network/interfaces "auto ${interface}"
-  echo >>/etc/network/interfaces "iface ${interface} inet static"
-  echo >>/etc/network/interfaces "  address ${address}"
-  echo >>/etc/network/interfaces "  netmask ${netmask}"
-  if [ ! -z "${gateway}" ] ; then
-    echo >>/etc/network/interfaces "  gateway ${gateway}"
-  fi
-  ifup ${interface}
- fi
-}
+export BE_ROLE Role Strat DBD Chat Map Cell isDev AuthHost Auth AuthDB CLUSTER ARENA_ID APP_ID NFSServer DBServer IsLocalMaster NO_DB_INSTALL CleanDB
 
-# Get our IP address
-# Need to make sure that we have eth1 configured.
-configureNetwork eth0:0 209.144.109.${addr} 255.255.255.192 209.144.109.129
-configureNetwork eth1   192.168.10.${addr} 255.255.255.0
-if [ ${Strat} -eq 1 ] ; then
-  configureNetwork eth1:0 192.168.10.1 255.255.255.0
-fi
-if [ ${Cell} -eq 1 ] ; then
-  configureNetwork eth2 192.168.11.${addr} 255.255.255.0
-fi
+run_script "configure-interfaces.sh"
 
-echo "* Configuring NFS services"
-perl -i -pe 's/^(Domain\s*=)\s*.*/\1 playnet.com/; s/^(Nobody-User|Nobody-Group\s*=)\s*.*/\1 wwiiol/;' /etc/idmapd.conf
-perl -i -pe 's/^(NEED_STATD|NEED_GSSD)=.*/${1}=no/; s/^(NEED_IDMAPD)=.*/$1=yes/;' /etc/default/nfs-common
+run_script "configure-apt-proxy.sh"
 
-modprobe nfs
-service lockd restart
-service idmapd stop
-service idmapd start
+run_script "adjust-ulimits.sh"
 
-if [ ${Strat} -eq 1 ] ; then
-  service nfs-kernel-server restart
+run_script "generate-berole-rc.sh"
 
-  echo "Todo:"
-  echo "- Re-populate /playnet,"
-  echo "- Re-populate /home/wwiiol,"
-  echo "- Copy my.cnf to /etc/mysql/my.cnf and edit,"
-  echo "- Fix & restart the database"
-else
-  mount /playnet
+run_script "create-directory-structure.sh"
+
+run_script "generate-cluster-rc.sh"
+
+run_script "remove-extra-packages.sh"
+
+run_script "install-os-packages.sh"
+
+run_script "install-game-packages.sh"
+
+run_script "configure-nfs.sh"
+
+run_script "configure-ldconfig.sh"
+
+run_script "install-database-server.sh"
+
+run_script "populate-wwiiol-home.sh"
+
+export BE_ROLE Role Strat DBD Chat Map Cell isDev AuthHost Auth AuthDB CLUSTER ARENA_ID APP_ID NFSServer DBServer IsLocalMaster NO_DB_INSTALL CleanDB
+
+# Execute presumably sorted list of scripts and
+# execute those which are either cluster wide
+# or match our role.
+if [ -d ./scripts ] ; then
+ for script in scripts/[0-9]*.sh
+ do
+  cmd="ROLE=${Role} . \"${script}\""
+  case "$script" in
+   *.${CLUSTER}.*|*.cluster.*|*[.\+]${Role}[.\+]*)
+    debugOut "Running ${cmd}"
+    eval $cmd || die "Error executing $cmd: $?"
+   ;;
+   *) debugOut "/Skipping/ ${cmd}"
+   ;;
+  esac
+ done
 fi
 
-# Add the playnet librarys folder to ldconfig.
-echo "* Adding /playnet/wwiiol/lib to library config"
-echo -e "# PlayNet product specific libraries.\n/playnet/wwiiol/lib" >/etc/ld.so.conf.d/playnet.conf
-ldconfig
-ldconfig /playnet/wwiiol/lib
+echo -e "\e[m\e[32mSUCCESS: Finished installation.\e[m"
+

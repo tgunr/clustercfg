@@ -1,0 +1,9 @@
+#! /bin/sh
+
+if test "x$BE_ROLE" = "x" ; then
+ echo "FAIL: No BE_ROLE variable defined"
+ exit 1
+fi
+
+killall -USR2 $BE_ROLE
+

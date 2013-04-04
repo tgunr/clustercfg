@@ -1,0 +1,30 @@
+#! /usr/bin/python
+
+import smtplib
+from email.mime.text import MIMEText
+from socket import gethostname
+from sys import argv
+
+myhost = gethostname()
+
+msgText = 'n/t'
+msgNote = 'alert'
+if len(argv) > 1:
+	msgNote = argv[1]
+	if len(argv) > 2:
+		msgText = ' '.join((argv[2:]))
+
+msg = MIMEText(msgText)
+
+toList = 'wwiiol-prod@playnet.com'
+toAddr = ','.join(toList)
+fromAddr = 'osmith@playnet.com'
+
+msg['To'] = toAddr
+msg['From'] = fromAddr
+msg['Subject'] = '%s %s' % (myhost, msgNote) 
+
+s = smtplib.SMTP('mail.playnet.com')
+s.sendmail(fromAddr, toList, msg.as_string())
+s.quit()
+
